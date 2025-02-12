@@ -12,11 +12,9 @@
 
 import collections
 
-from urllib.parse import urlparse
-
 from pyramid.exceptions import ConfigurationError
 from sqlalchemy.orm.base import NO_VALUE
-from sqlalchemy.orm.session import Session
+from urllib3.util import parse_url
 
 from warehouse import db
 from warehouse.accounts.models import Email, User
@@ -24,6 +22,7 @@ from warehouse.legacy.api.xmlrpc.cache.derivers import cached_return_view
 from warehouse.legacy.api.xmlrpc.cache.fncache import RedisLru
 from warehouse.legacy.api.xmlrpc.cache.interfaces import IXMLRPCCache
 from warehouse.legacy.api.xmlrpc.cache.services import NullXMLRPCCache, RedisXMLRPCCache
+from warehouse.utils.db import orm_session_from_obj
 
 __all__ = ["RedisLru"]
 
@@ -33,7 +32,7 @@ CacheKeys = collections.namedtuple("CacheKeys", ["cache", "purge"])
 
 def receive_set(attribute, config, target):
     cache_keys = config.registry["cache_keys"]
-    session = Session.object_session(target)
+    session = orm_session_from_obj(target)
     purges = session.info.setdefault("warehouse.legacy.api.xmlrpc.cache.purges", set())
     key_maker = cache_keys[attribute]
     keys = key_maker(target).purge
@@ -95,7 +94,7 @@ def includeme(config):
             "Cannot configure xlmrpc_cache without warehouse.xmlrpc.cache.url"
         )
 
-    xmlrpc_cache_url_scheme = urlparse(xmlrpc_cache_url).scheme
+    xmlrpc_cache_url_scheme = parse_url(xmlrpc_cache_url).scheme
     if xmlrpc_cache_url_scheme in ("redis", "rediss"):
         xmlrpc_cache_class = RedisXMLRPCCache
     elif xmlrpc_cache_url_scheme in ("null"):
